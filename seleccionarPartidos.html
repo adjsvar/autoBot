@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Selección de Partidos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+    
+    /* Barra de título personalizada */
+    .titlebar {
+      height: 36px;
+      background-color: #1e293b;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #334155;
+    }
+    
+    .titlebar-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      color: #60a5fa;
+    }
+    
+    .titlebar-title {
+      flex-grow: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    
+    .titlebar-controls {
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+    
+    .titlebar-button {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .titlebar-button:hover {
+      background-color: #334155;
+    }
+    
+    .titlebar-button.close:hover {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 1rem;
+    }
+    
+    .header {
+      margin-bottom: 1rem;
+      text-align: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+    
+    .header h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      color: #60a5fa;
+    }
+    
+    .btn-volver {
+      position: absolute;
+      left: 0;
+      top: 0;
+      background-color: #334155;
+      color: #e2e8f0;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background-color 0.2s ease;
+    }
+    
+    .btn-volver:hover {
+      background-color: #475569;
+    }
+    
+    .btn-volver svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .search-container {
+      display: flex;
+      margin-bottom: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #1e293b;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      flex-shrink: 0;
+    }
+    
+    #search {
+      flex: 1;
+      background-color: #334155;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 0.75rem;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    #search:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
+    }
+    
+    .partidos-scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      background-color: #0f172a;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      position: relative;
+      /* Estilos para la barra de desplazamiento */
+      scrollbar-width: thin;
+      scrollbar-color: #475569 #1e293b;
+    }
+    
+    /* Estilos para la barra de desplazamiento en Chrome/Safari */
+    .partidos-scroll-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .partidos-scroll-container::-webkit-scrollbar-track {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    
+    .partidos-scroll-container::-webkit-scrollbar-thumb {
+      background-color: #475569;
+      border-radius: 4px;
+    }
+    
+    .partidos-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+      padding: 1rem;
+    }
+    
+    .partido-card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .partido-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      border-color: #60a5fa;
+    }
+    
+    .partido-card.selected {
+      background-color: #2563eb;
+      border-color: #60a5fa;
+    }
+    
+    .partido-card.selected::after {
+      content: "✓";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.2rem;
+      color: white;
+    }
+    
+    .partido-titulo {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: #e2e8f0;
+    }
+    
+    .partido-fecha {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .equipos {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .equipo {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+    
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+    
+    .footer {
+      margin-top: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background-color: #1e293b;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    
+    .stats {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    
+    .btn {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .btn:hover {
+      background-color: #1d4ed8;
+    }
+    
+    .btn:disabled {
+      background-color: #475569;
+      cursor: not-allowed;
+    }
+    
+    .status-message {
+      color: #60a5fa;
+      font-size: 0.85rem;
+      margin-left: 1rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .status-message.visible {
+      opacity: 1;
+    }
+    
+    /* Barra de estado estilo minimalista */
+    .statusbar {
+      height: 30px;
+      background-color: #1e293b;
+      border-top: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #94a3b8;
+      justify-content: space-between;
+    }
+    
+    .statusbar-section {
+      display: flex;
+      align-items: center;
+    }
+    
+    .statusbar-item {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      height: 100%;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    
+    .statusbar-item:hover {
+      background-color: #334155;
+    }
+    
+    @media (max-width: 768px) {
+      .partidos-container {
+        grid-template-columns: 1fr;
+      }
+      
+      .footer {
+        flex-direction: column;
+        gap: 1rem;
+      }
+      
+      .btn-volver {
+        position: static;
+        margin-bottom: 1rem;
+        width: fit-content;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de título personalizada -->
+  <div class="titlebar">
+    <div class="titlebar-icon">🤖</div>
+    <div class="titlebar-title">AutoBot - Selección de Partidos</div>
+    <div class="titlebar-controls">
+      <button class="titlebar-button" id="minimize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="10" height="1" x="1" y="5.5" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button" id="maximize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="9" height="9" x="1.5" y="1.5" fill="none" stroke="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button close" id="close-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <path d="M 1,1 L 11,11 M 1,11 L 11,1" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <button id="btn-volver" class="btn-volver">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver
+      </button>
+      <h1>Selección de Partidos</h1>
+    </div>
+    
+    <div class="search-container">
+      <input type="text" id="search" placeholder="Buscar por equipo, liga o fecha...">
+    </div>
+    
+    <div class="partidos-scroll-container">
+      <div id="partidos-container" class="partidos-container">
+        <!-- Los partidos se cargarán aquí dinámicamente -->
+        <div class="no-results">Cargando partidos...</div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <div class="stats">
+        <span id="total-partidos">0</span> partidos encontrados | 
+        <span id="seleccionados">0</span> seleccionados
+        <span id="status-message" class="status-message"></span>
+      </div>
+      <button id="btn-deseleccionar" class="btn" disabled>Deseleccionar Todos</button>
+    </div>
+  </div>
+  
+  <!-- Barra de estado -->
+  <div class="statusbar">
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        <span id="statusText">AutoBot - Selección de Partidos</span>
+      </div>
+    </div>
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        AutoBot 1.0.0
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Importar ipcRenderer para comunicación con el proceso principal
+    const { ipcRenderer } = require('electron');
+    
+    // Variables globales
+    let partidos = [];
+    let partidosSeleccionados = new Set();
+    let guardadoAutomatico = true;
+    let timeoutBusqueda = null;
+    let partidosFiltradosCache = [];
+    
+    // Elementos DOM
+    const searchInput = document.getElementById('search');
+    const partidosContainer = document.getElementById('partidos-container');
+    const totalPartidosEl = document.getElementById('total-partidos');
+    const seleccionadosEl = document.getElementById('seleccionados');
+    const btnDeseleccionar = document.getElementById('btn-deseleccionar');
+    const statusMessageEl = document.getElementById('status-message');
+    const btnVolver = document.getElementById('btn-volver');
+    
+    // Controles de ventana personalizada
+    const minimizeBtn = document.getElementById('minimize-btn');
+    const maximizeBtn = document.getElementById('maximize-btn');
+    const closeBtn = document.getElementById('close-btn');
+    
+    // Event listeners para los controles de ventana
+    minimizeBtn.addEventListener('click', () => {
+      ipcRenderer.send('minimize-app');
+    });
+    
+    maximizeBtn.addEventListener('click', () => {
+      ipcRenderer.send('maximize-app');
+    });
+    
+    closeBtn.addEventListener('click', () => {
+      ipcRenderer.send('close-app');
+    });
+    
+    // Función de debounce para retrasar la búsqueda
+    const debounce = (func, delay) => {
+      return function() {
+        const context = this;
+        const args = arguments;
+        clearTimeout(timeoutBusqueda);
+        timeoutBusqueda = setTimeout(() => func.apply(context, args), delay);
+      };
+    };
+    
+    // Mostrar mensaje de estado temporal
+    const mostrarMensajeEstado = (mensaje) => {
+      statusMessageEl.textContent = mensaje;
+      statusMessageEl.classList.add('visible');
+      
+      setTimeout(() => {
+        statusMessageEl.classList.remove('visible');
+      }, 2000);
+    };
+    
+    // Formateador de fechas
+    const formatearFecha = (fechaISO) => {
+      const fecha = new Date(fechaISO);
+      return fecha.toLocaleString('es-ES', { 
+        day: '2-digit', 
+        month: '2-digit', 
+        year: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit'
+      });
+    };
+    
+    // Renderizar todos los partidos
+    const renderizarPartidos = (partidosFiltrados) => {
+      partidosContainer.innerHTML = '';
+      
+      if (partidosFiltrados.length === 0) {
+        partidosContainer.innerHTML = '<div class="no-results">No se encontraron partidos</div>';
+        return;
+      }
+      
+      // Mostrar TODOS los partidos sin limitación
+      partidosFiltrados.forEach(partido => {
+        const partidoEl = document.createElement('div');
+        partidoEl.className = `partido-card ${partidosSeleccionados.has(partido.link) ? 'selected' : ''}`;
+        partidoEl.dataset.id = partido.link;
+        
+        partidoEl.innerHTML = `
+          <div class="partido-titulo">${partido.nombre}</div>
+          <div class="partido-fecha">${formatearFecha(partido.fecha)}</div>
+          <div class="equipos">
+            <div class="equipo">${partido.equipo1}</div>
+            <div class="equipo">${partido.equipo2}</div>
+          </div>
+        `;
+        
+        partidoEl.addEventListener('click', () => {
+          toggleSeleccion(partido.link, partidoEl);
+        });
+        
+        partidosContainer.appendChild(partidoEl);
+      });
+      
+      // Actualizar contadores
+      totalPartidosEl.textContent = partidosFiltrados.length;
+    };
+    
+    // Guardar partidos seleccionados en archivo
+    const guardarPartidosSeleccionados = async () => {
+      // Crear lista de partidos seleccionados
+      const partidosGuardar = partidos.filter(partido => 
+        partidosSeleccionados.has(partido.link)
+      );
+      
+      // Crear un objeto con la selección y la fecha
+      const seleccion = {
+        fecha: new Date().toISOString(),
+        partidos: partidosGuardar
+      };
+      
+      try {
+        // Enviar al proceso principal para guardar en archivo
+        const resultado = await ipcRenderer.invoke('guardar-partidos-seleccionados', seleccion);
+        if (resultado.success) {
+          mostrarMensajeEstado(`Guardados ${partidosGuardar.length} partidos`);
+          return true;
+        } else {
+          console.error('Error al guardar partidos:', resultado.error);
+          return false;
+        }
+      } catch (error) {
+        console.error('Error al guardar partidos seleccionados:', error);
+        return false;
+      }
+    };
+    
+    // Alternar selección de un partido
+    const toggleSeleccion = async (id, elemento) => {
+      if (partidosSeleccionados.has(id)) {
+        partidosSeleccionados.delete(id);
+        elemento.classList.remove('selected');
+      } else {
+        partidosSeleccionados.add(id);
+        elemento.classList.add('selected');
+      }
+      
+      // Actualizar contador de seleccionados
+      seleccionadosEl.textContent = partidosSeleccionados.size;
+      btnDeseleccionar.disabled = partidosSeleccionados.size === 0;
+      
+      // Guardar automáticamente
+      if (guardadoAutomatico) {
+        await guardarPartidosSeleccionados();
+      }
+    };
+    
+    // Filtrar partidos según el texto de búsqueda (versión optimizada)
+    const filtrarPartidos = (texto) => {
+      const textoBusqueda = texto.toLowerCase().trim();
+      
+      if (!textoBusqueda) {
+        partidosFiltradosCache = partidos;
+        return partidos;
+      }
+      
+      // Comprobar si la búsqueda es más específica que la anterior
+      // para reutilizar la caché de resultados
+      if (partidosFiltradosCache.length < partidos.length && 
+          partidosFiltradosCache.length > 0 && 
+          textoBusqueda.includes(searchInput.dataset.lastSearch || '')) {
+        // Filtrar partidos desde la caché para búsquedas más específicas
+        partidosFiltradosCache = partidosFiltradosCache.filter(partido => {
+          const nombre = partido.nombre.toLowerCase();
+          const equipo1 = partido.equipo1.toLowerCase();
+          const equipo2 = partido.equipo2.toLowerCase();
+          
+          return nombre.includes(textoBusqueda) || 
+                 equipo1.includes(textoBusqueda) || 
+                 equipo2.includes(textoBusqueda);
+        });
+      } else {
+        // Realizar búsqueda completa en todos los partidos
+        partidosFiltradosCache = partidos.filter(partido => {
+          const nombre = partido.nombre.toLowerCase();
+          const equipo1 = partido.equipo1.toLowerCase();
+          const equipo2 = partido.equipo2.toLowerCase();
+          
+          return nombre.includes(textoBusqueda) || 
+                 equipo1.includes(textoBusqueda) || 
+                 equipo2.includes(textoBusqueda);
+        });
+      }
+      
+      // Guardar la búsqueda actual para comparaciones futuras
+      searchInput.dataset.lastSearch = textoBusqueda;
+      
+      return partidosFiltradosCache;
+    };
+    
+    // Cargar datos desde el archivo JSON
+    const cargarDatos = async () => {
+      try {
+        const response = await fetch('partidos.json');
+        if (!response.ok) {
+          throw new Error('No se pudo cargar el archivo de partidos');
+        }
+        
+        partidos = await response.json();
+        
+        // Ordenar partidos por fecha (más cercanos primero)
+        partidos.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+        
+        totalPartidosEl.textContent = partidos.length;
+        
+        // Cargar partidos seleccionados desde el archivo
+        try {
+          const partidosSeleccionadosData = await ipcRenderer.invoke('cargar-partidos-seleccionados');
+          if (partidosSeleccionadosData.success && partidosSeleccionadosData.data) {
+            const { partidos: partidosPrevios } = partidosSeleccionadosData.data;
+            
+            // Limpiar selección previa
+            partidosSeleccionados.clear();
+            
+            // Añadir partidos a la selección
+            partidosPrevios.forEach(partido => {
+              partidosSeleccionados.add(partido.link);
+            });
+            
+            seleccionadosEl.textContent = partidosSeleccionados.size;
+            btnDeseleccionar.disabled = partidosSeleccionados.size === 0;
+            
+            mostrarMensajeEstado(`Cargados ${partidosSeleccionados.size} partidos seleccionados`);
+          }
+        } catch (e) {
+          console.error('Error al cargar partidos seleccionados:', e);
+        }
+        
+        // Inicializar caché de filtrado
+        partidosFiltradosCache = partidos;
+        renderizarPartidos(partidos);
+      } catch (error) {
+        console.error('Error al cargar los datos:', error);
+        partidosContainer.innerHTML = `
+          <div class="no-results">
+            Error al cargar los partidos: ${error.message}
+          </div>
+        `;
+      }
+    };
+    
+    // Función de búsqueda con debounce para mejorar rendimiento
+    const buscarPartidos = debounce(() => {
+      const partidosFiltrados = filtrarPartidos(searchInput.value);
+      renderizarPartidos(partidosFiltrados);
+    }, 300); // Esperar 300ms después de que el usuario deje de escribir
+    
+    // Escuchar cambios en el campo de búsqueda
+    searchInput.addEventListener('input', buscarPartidos);
+    
+    // Deseleccionar todos los partidos
+    const deseleccionarTodos = async () => {
+      // Limpiar el conjunto de seleccionados
+      partidosSeleccionados.clear();
+      
+      // Actualizar la interfaz
+      document.querySelectorAll('.partido-card.selected').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      // Actualizar contador
+      seleccionadosEl.textContent = '0';
+      btnDeseleccionar.disabled = true;
+      
+      // Guardar la selección vacía
+      await guardarPartidosSeleccionados();
+      mostrarMensajeEstado('Todos los partidos deseleccionados');
+    };
+    
+    // Deseleccionar todos los partidos (botón)
+    btnDeseleccionar.addEventListener('click', deseleccionarTodos);
+    
+    // Volver a la página principal
+    btnVolver.addEventListener('click', () => {
+      // Asegurarse de guardar antes de volver
+      guardarPartidosSeleccionados().then(() => {
+        // Notificar al proceso principal que estamos volviendo
+        ipcRenderer.send('seleccion-partidos-cerrada');
+      });
+    });
+    
+    // Notificar al proceso principal cuando se cierra la ventana
+    window.addEventListener('beforeunload', () => {
+      ipcRenderer.send('seleccion-partidos-cerrada');
+    });
+    
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', () => {
+      cargarDatos();
+    });
+  </script>
+</body>
+</html> 

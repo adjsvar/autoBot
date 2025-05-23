@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoBot - Buscador de Partidos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+    
+    /* Barra de título personalizada */
+    .titlebar {
+      height: 36px;
+      background-color: #1e293b;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #334155;
+    }
+    
+    .titlebar-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      color: #60a5fa;
+    }
+    
+    .titlebar-title {
+      flex-grow: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    
+    .titlebar-controls {
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+    
+    .titlebar-button {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .titlebar-button:hover {
+      background-color: #334155;
+    }
+    
+    .titlebar-button.close:hover {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 2rem;
+      background-color: #0f172a;
+    }
+    
+    .buttons-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      width: 250px;
+      max-width: 100%;
+    }
+    
+    /* Botones estilo minimalista */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+      background-color: #1e293b;
+      border: none;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      text-align: center;
+      position: relative;
+      border: 1px solid #334155;
+    }
+    
+    .btn:hover {
+      background-color: #2d3748;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .btn:active, .btn.active {
+      background-color: #3b4252;
+      transform: translateY(0);
+      box-shadow: none;
+    }
+    
+    .loader {
+      border: 2px solid #1e293b;
+      border-top: 2px solid #60a5fa;
+      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+      display: none;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Barra de estado estilo minimalista */
+    .statusbar {
+      height: 30px;
+      background-color: #1e293b;
+      border-top: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #94a3b8;
+      justify-content: space-between;
+    }
+    
+    .statusbar-section {
+      display: flex;
+      align-items: center;
+    }
+    
+    .statusbar-item {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      height: 100%;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    
+    .statusbar-item:hover {
+      background-color: #334155;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      margin-right: 6px;
+    }
+    
+    .status-dot.connected {
+      background-color: #10b981;
+    }
+    
+    /* Diseño responsivo */
+    @media (max-width: 600px) {
+      .container {
+        padding: 1rem;
+      }
+      
+      .buttons-container {
+        width: 90%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de título personalizada -->
+  <div class="titlebar">
+    <div class="titlebar-icon">🤖</div>
+    <div class="titlebar-title">AutoBot</div>
+    <div class="titlebar-controls">
+      <button class="titlebar-button" id="minimize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="10" height="1" x="1" y="5.5" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button" id="maximize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="9" height="9" x="1.5" y="1.5" fill="none" stroke="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button close" id="close-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <path d="M 1,1 L 11,11 M 1,11 L 11,1" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <div class="container">
+    <div class="buttons-container">
+      <button id="btnLogin" class="btn">
+        Iniciar Sesión
+      </button>
+      <button id="btnSearch" class="btn">
+        Buscar Partidos
+      </button>
+      <button id="btnSelect" class="btn">
+        Seleccionar Partidos
+      </button>
+      <button id="btnAuto" class="btn">
+        Modo Auto
+      </button>
+      <button id="btnConfig" class="btn">
+        Configuración
+      </button>
+    </div>
+  </div>
+  
+  <!-- Barra de estado -->
+  <div class="statusbar">
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText">Navegador no iniciado</span>
+        <div id="loader" class="loader"></div>
+      </div>
+    </div>
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        AutoBot 1.0.0
+      </div>
+    </div>
+  </div>
+  
+  <script src="./renderer.js"></script>
+</body>
+</html> 

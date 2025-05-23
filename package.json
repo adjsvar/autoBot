@@ -1,0 +1,28 @@
+{
+  "name": "autobot",
+  "version": "1.0.0",
+  "description": "Aplicación para automatizar la búsqueda de partidos de fútbol",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "buscar-partidos": "node buscarPartidos.js",
+    "start": "NODE_ENV=production electron .",
+    "dev": "electron . --dev"
+  },
+  "keywords": [
+    "electron",
+    "scraping",
+    "football",
+    "automation"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^36.2.1",
+    "playwright": "^1.52.0"
+  },
+  "dependencies": {
+    "canvas": "^3.1.0"
+  }
+}

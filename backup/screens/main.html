@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoBot - Buscador de Partidos</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+    
+    /* Barra de título personalizada */
+    .titlebar {
+      height: 36px;
+      background-color: #1e293b;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #334155;
+      z-index: 1000;
+    }
+    
+    .titlebar-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      color: #60a5fa;
+    }
+    
+    .titlebar-title {
+      flex-grow: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    
+    .titlebar-controls {
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+    
+    .titlebar-button {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .titlebar-button:hover {
+      background-color: #334155;
+    }
+    
+    .titlebar-button.close:hover {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    /* Contenedor principal */
+    .container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      background-color: #0f172a;
+    }
+    
+    /* Barra lateral */
+    .sidebar {
+      width: 200px;
+      background-color: #1e293b;
+      border-right: 1px solid #334155;
+      padding: 1rem 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    
+    /* Botones estilo minimalista */
+    .btn {
+      display: flex;
+      align-items: center;
+      color: #e2e8f0;
+      background-color: transparent;
+      border: none;
+      padding: 0.75rem 1rem;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+      text-align: left;
+      border-left: 3px solid transparent;
+    }
+    
+    .btn:hover {
+      background-color: #2d3748;
+    }
+    
+    .btn:active, .btn.active {
+      background-color: #3b4252;
+      border-left-color: #60a5fa;
+    }
+    
+    .btn-icon {
+      margin-right: 0.5rem;
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    /* Área de contenido */
+    .content-area {
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .view {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      background-color: #0f172a;
+      display: none;
+      padding: 1rem;
+    }
+    
+    .view.active {
+      display: block;
+    }
+    
+    .home-view {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+    }
+    
+    .home-logo {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    
+    .home-title {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: #60a5fa;
+    }
+    
+    .home-description {
+      text-align: center;
+      max-width: 500px;
+      color: #94a3b8;
+      margin-bottom: 2rem;
+    }
+    
+    .loader {
+      border: 2px solid #1e293b;
+      border-top: 2px solid #60a5fa;
+      border-radius: 50%;
+      width: 10px;
+      height: 10px;
+      animation: spin 1s linear infinite;
+      margin-left: 8px;
+      display: none;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Buscador mejorado */
+    .search-container {
+      display: flex;
+      margin-bottom: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: #1e293b;
+      padding: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+    
+    .search-input {
+      flex: 1;
+      background-color: #334155;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 0.75rem;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .search-input:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
+    }
+    
+    /* Contenedor de partidos */
+    .partidos-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1rem;
+    }
+    
+    .partido-card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .partido-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      border-color: #60a5fa;
+    }
+    
+    .partido-card.selected {
+      background-color: #2563eb;
+      border-color: #60a5fa;
+    }
+    
+    .partido-card.selected::after {
+      content: "✓";
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 1.2rem;
+      color: white;
+    }
+    
+    .partido-titulo {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: #e2e8f0;
+    }
+    
+    .partido-fecha {
+      color: #94a3b8;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .equipos {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    
+    .equipo {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+    
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 2rem;
+      color: #94a3b8;
+      font-size: 1.1rem;
+    }
+    
+    .stats-footer {
+      margin-top: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background-color: #1e293b;
+      border-radius: 8px;
+    }
+    
+    .stats {
+      color: #94a3b8;
+      font-size: 0.9rem;
+    }
+    
+    .action-btn {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .action-btn:hover {
+      background-color: #1d4ed8;
+    }
+    
+    .action-btn:disabled {
+      background-color: #475569;
+      cursor: not-allowed;
+    }
+    
+    .status-message {
+      color: #60a5fa;
+      font-size: 0.85rem;
+      margin-left: 1rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .status-message.visible {
+      opacity: 1;
+    }
+    
+    /* Barra de estado estilo minimalista */
+    .statusbar {
+      height: 30px;
+      background-color: #1e293b;
+      border-top: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #94a3b8;
+      justify-content: space-between;
+      z-index: 1000;
+    }
+    
+    .statusbar-section {
+      display: flex;
+      align-items: center;
+    }
+    
+    .statusbar-item {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      height: 100%;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    
+    .statusbar-item:hover {
+      background-color: #334155;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #ef4444;
+      margin-right: 6px;
+    }
+    
+    .status-dot.connected {
+      background-color: #10b981;
+    }
+    
+    /* Diseño responsivo */
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      
+      .sidebar {
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid #334155;
+        padding: 0.5rem 0;
+      }
+      
+      .btn {
+        padding: 0.5rem 1rem;
+      }
+      
+      .partidos-container {
+        grid-template-columns: 1fr;
+      }
+      
+      .stats-footer {
+        flex-direction: column;
+        gap: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de título personalizada -->
+  <div class="titlebar">
+    <div class="titlebar-icon">🤖</div>
+    <div class="titlebar-title">AutoBot</div>
+    <div class="titlebar-controls">
+      <button class="titlebar-button" id="minimize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="10" height="1" x="1" y="5.5" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button" id="maximize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="9" height="9" x="1.5" y="1.5" fill="none" stroke="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button close" id="close-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <path d="M 1,1 L 11,11 M 1,11 L 11,1" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <div class="container">
+    <!-- Barra lateral con menú -->
+    <div class="sidebar">
+      <button id="btnHome" class="btn active">
+        <div class="btn-icon">🏠</div>
+        <span>Inicio</span>
+      </button>
+      <button id="btnLogin" class="btn">
+        <div class="btn-icon">🔑</div>
+        <span>Iniciar Sesión</span>
+      </button>
+      <button id="btnSearch" class="btn">
+        <div class="btn-icon">🔍</div>
+        <span>Buscar Partidos</span>
+      </button>
+      <button id="btnSelect" class="btn">
+        <div class="btn-icon">✅</div>
+        <span>Seleccionar Partidos</span>
+      </button>
+      <button id="btnAuto" class="btn">
+        <div class="btn-icon">🤖</div>
+        <span>Modo Auto</span>
+      </button>
+      <button id="btnConfig" class="btn">
+        <div class="btn-icon">⚙️</div>
+        <span>Configuración</span>
+      </button>
+    </div>
+    
+    <!-- Área de contenido -->
+    <div class="content-area">
+      <!-- Vista de inicio -->
+      <div id="homeView" class="view home-view active">
+        <div class="home-logo">🤖</div>
+        <h1 class="home-title">AutoBot</h1>
+        <p class="home-description">
+          Bienvenido a AutoBot, tu asistente para buscar y seleccionar partidos de fútbol.
+          Utiliza la barra lateral para navegar entre las diferentes funciones.
+        </p>
+      </div>
+      
+      <!-- Vista de seleccionar partidos -->
+      <div id="selectView" class="view">
+        <h2 style="margin-bottom: 1rem; color: #60a5fa;">Selección de Partidos</h2>
+        
+        <div class="search-container">
+          <input type="text" id="searchPartidos" class="search-input" placeholder="Buscar por equipo, liga o fecha...">
+        </div>
+        
+        <div id="partidosContainer" class="partidos-container">
+          <!-- Los partidos se cargarán aquí dinámicamente -->
+          <div class="no-results">No hay partidos cargados. Primero debes buscar partidos.</div>
+        </div>
+        
+        <div class="stats-footer">
+          <div class="stats">
+            <span id="totalPartidos">0</span> partidos encontrados | 
+            <span id="seleccionados">0</span> seleccionados
+            <span id="statusMessage" class="status-message"></span>
+          </div>
+          <button id="btnGuardar" class="action-btn" disabled>Guardar Selección</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Barra de estado -->
+  <div class="statusbar">
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText">Navegador no iniciado</span>
+        <div id="loader" class="loader"></div>
+      </div>
+    </div>
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        AutoBot 1.0.0
+      </div>
+    </div>
+  </div>
+  
+  <!-- Cargar scripts necesarios -->
+  <script src="../renderer.js"></script>
+  <script src="./main.js"></script>
+</body>
+</html> 

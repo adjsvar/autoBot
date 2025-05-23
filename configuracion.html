@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+    }
+    
+    /* Barra de título personalizada */
+    .titlebar {
+      height: 36px;
+      background-color: #1e293b;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+      -webkit-app-region: drag;
+      border-bottom: 1px solid #334155;
+    }
+    
+    .titlebar-icon {
+      width: 16px;
+      height: 16px;
+      margin-right: 10px;
+      color: #60a5fa;
+    }
+    
+    .titlebar-title {
+      flex-grow: 1;
+      font-size: 14px;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    
+    .titlebar-controls {
+      display: flex;
+      -webkit-app-region: no-drag;
+    }
+    
+    .titlebar-button {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e2e8f0;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .titlebar-button:hover {
+      background-color: #334155;
+    }
+    
+    .titlebar-button.close:hover {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 1rem;
+    }
+    
+    .header {
+      margin-bottom: 1rem;
+      text-align: center;
+      position: relative;
+      flex-shrink: 0;
+    }
+    
+    .header h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+      color: #60a5fa;
+    }
+    
+    .btn-volver {
+      position: absolute;
+      left: 0;
+      top: 0;
+      background-color: #334155;
+      color: #e2e8f0;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: background-color 0.2s ease;
+    }
+    
+    .btn-volver:hover {
+      background-color: #475569;
+    }
+    
+    .btn-volver svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .config-container {
+      flex: 1;
+      overflow-y: auto;
+      background-color: #1e293b;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 1rem;
+      /* Estilos para la barra de desplazamiento */
+      scrollbar-width: thin;
+      scrollbar-color: #475569 #1e293b;
+    }
+    
+    /* Estilos para la barra de desplazamiento en Chrome/Safari */
+    .config-container::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    .config-container::-webkit-scrollbar-track {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    
+    .config-container::-webkit-scrollbar-thumb {
+      background-color: #475569;
+      border-radius: 4px;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+    
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      background-color: #334155;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 0.75rem;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.3);
+    }
+    
+    .form-group input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    
+    .form-group input[type="number"]::-webkit-outer-spin-button,
+    .form-group input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    
+    .form-group .description {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem;
+      background-color: #1e293b;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+    
+    .status-message {
+      color: #60a5fa;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    
+    .status-message.visible {
+      opacity: 1;
+    }
+    
+    .btn {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 4px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+    
+    .btn:hover {
+      background-color: #1d4ed8;
+    }
+    
+    .btn-group {
+      display: flex;
+      gap: 1rem;
+    }
+    
+    .btn-reset {
+      background-color: #475569;
+    }
+    
+    .btn-reset:hover {
+      background-color: #64748b;
+    }
+    
+    /* Barra de estado estilo minimalista */
+    .statusbar {
+      height: 30px;
+      background-color: #1e293b;
+      border-top: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #94a3b8;
+      justify-content: space-between;
+    }
+    
+    .statusbar-section {
+      display: flex;
+      align-items: center;
+    }
+    
+    .statusbar-item {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      height: 100%;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    
+    .statusbar-item:hover {
+      background-color: #334155;
+    }
+    
+    @media (max-width: 768px) {
+      .btn-volver {
+        position: static;
+        margin-bottom: 1rem;
+        width: fit-content;
+      }
+      
+      .config-container {
+        padding: 1rem;
+      }
+      
+      .footer {
+        flex-direction: column;
+        gap: 1rem;
+      }
+      
+      .btn-group {
+        width: 100%;
+      }
+      
+      .btn {
+        flex: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Barra de título personalizada -->
+  <div class="titlebar">
+    <div class="titlebar-icon">🤖</div>
+    <div class="titlebar-title">AutoBot - Configuración</div>
+    <div class="titlebar-controls">
+      <button class="titlebar-button" id="minimize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="10" height="1" x="1" y="5.5" fill="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button" id="maximize-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <rect width="9" height="9" x="1.5" y="1.5" fill="none" stroke="currentColor" />
+        </svg>
+      </button>
+      <button class="titlebar-button close" id="close-btn">
+        <svg width="10" height="10" viewBox="0 0 12 12">
+          <path d="M 1,1 L 11,11 M 1,11 L 11,1" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+      </button>
+    </div>
+  </div>
+  
+  <div class="container">
+    <div class="header">
+      <button id="btn-volver" class="btn-volver">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver
+      </button>
+      <h1>Configuración</h1>
+    </div>
+    
+    <div class="config-container">
+      <div class="form-group">
+        <label for="repeticiones">Repeticiones:</label>
+        <input type="number" id="repeticiones" min="1" max="100" value="1">
+        <div class="description">Número de veces que se repetirá cada operación</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="montoApuesta">Monto de Apuesta:</label>
+        <input type="number" id="montoApuesta" min="10" max="1000" value="50">
+        <div class="description">Monto a apostar en cada partido (en tu moneda local)</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="cantidadPartidos">Cantidad de Partidos:</label>
+        <input type="number" id="cantidadPartidos" min="1" max="20" value="5">
+        <div class="description">Número de partidos a seleccionar automáticamente</div>
+      </div>
+      
+      <div class="form-group">
+        <label for="tipoApuesta">Tipo de Apuesta:</label>
+        <select id="tipoApuesta">
+          <option value="Más de 1">Más de 1</option>
+          <option value="Más de 1.5">Más de 1.5</option>
+          <option value="Más de 2">Más de 2</option>
+          <option value="Más de 2.5">Más de 2.5</option>
+          <option value="Menos de 1">Menos de 1</option>
+          <option value="Menos de 1.5">Menos de 1.5</option>
+          <option value="Menos de 2">Menos de 2</option>
+          <option value="Menos de 2.5">Menos de 2.5</option>
+          <option value="Ambos equipos marcarán">Ambos equipos marcarán</option>
+          <option value="Victoria Local">Victoria Local</option>
+          <option value="Victoria Visitante">Victoria Visitante</option>
+          <option value="Empate">Empate</option>
+        </select>
+        <div class="description">Tipo de apuesta a realizar</div>
+      </div>
+    </div>
+    
+    <div class="footer">
+      <span id="status-message" class="status-message"></span>
+    </div>
+  </div>
+  
+  <!-- Barra de estado -->
+  <div class="statusbar">
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        <span id="statusText">AutoBot - Configuración</span>
+      </div>
+    </div>
+    <div class="statusbar-section">
+      <div class="statusbar-item">
+        AutoBot 1.0.0
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    // Importar ipcRenderer para comunicación con el proceso principal
+    const { ipcRenderer } = require('electron');
+    
+    // Valores por defecto
+    const defaultConfig = {
+      repeticiones: 1,
+      montoApuesta: 50,
+      cantidadPartidos: 5,
+      tipoApuesta: "Más de 1"
+    };
+    
+    // Referencias a elementos del DOM
+    const btnVolver = document.getElementById('btn-volver');
+    const statusMessage = document.getElementById('status-message');
+    
+    // Campos de formulario
+    const repeticionesInput = document.getElementById('repeticiones');
+    const montoApuestaInput = document.getElementById('montoApuesta');
+    const cantidadPartidosInput = document.getElementById('cantidadPartidos');
+    const tipoApuestaSelect = document.getElementById('tipoApuesta');
+    
+    // Controles de ventana personalizada
+    const minimizeBtn = document.getElementById('minimize-btn');
+    const maximizeBtn = document.getElementById('maximize-btn');
+    const closeBtn = document.getElementById('close-btn');
+    
+    // Event listeners para los controles de ventana
+    minimizeBtn.addEventListener('click', () => {
+      ipcRenderer.send('minimize-app');
+    });
+    
+    maximizeBtn.addEventListener('click', () => {
+      ipcRenderer.send('maximize-app');
+    });
+    
+    closeBtn.addEventListener('click', () => {
+      ipcRenderer.send('close-app');
+    });
+    
+    // Mostrar mensaje de estado
+    const mostrarMensaje = (mensaje) => {
+      statusMessage.textContent = mensaje;
+      statusMessage.classList.add('visible');
+      
+      setTimeout(() => {
+        statusMessage.classList.remove('visible');
+      }, 2000);
+    };
+    
+    // Cargar configuración
+    const cargarConfiguracion = async () => {
+      try {
+        const result = await ipcRenderer.invoke('cargar-configuracion');
+        
+        if (result.success && result.config) {
+          const config = result.config;
+          
+          // Aplicar valores a los campos
+          repeticionesInput.value = config.repeticiones || defaultConfig.repeticiones;
+          montoApuestaInput.value = config.montoApuesta || defaultConfig.montoApuesta;
+          cantidadPartidosInput.value = config.cantidadPartidos || defaultConfig.cantidadPartidos;
+          
+          // Seleccionar el tipo de apuesta si existe
+          if (config.tipoApuesta) {
+            // Buscar si existe la opción
+            const options = Array.from(tipoApuestaSelect.options);
+            const optionExists = options.some(option => option.value === config.tipoApuesta);
+            
+            if (optionExists) {
+              tipoApuestaSelect.value = config.tipoApuesta;
+            } else {
+              tipoApuestaSelect.value = defaultConfig.tipoApuesta;
+            }
+          } else {
+            tipoApuestaSelect.value = defaultConfig.tipoApuesta;
+          }
+          
+          mostrarMensaje('Configuración cargada');
+        } else {
+          // Si no hay configuración, usar los valores por defecto
+          cargarValoresPorDefecto();
+        }
+      } catch (error) {
+        console.error('Error al cargar la configuración:', error);
+        // Si hay error, usar los valores por defecto
+        cargarValoresPorDefecto();
+      }
+    };
+    
+    // Guardar configuración
+    const guardarConfiguracion = async () => {
+      try {
+        // Obtener valores de los campos
+        const config = {
+          repeticiones: parseInt(repeticionesInput.value, 10) || defaultConfig.repeticiones,
+          montoApuesta: parseInt(montoApuestaInput.value, 10) || defaultConfig.montoApuesta,
+          cantidadPartidos: parseInt(cantidadPartidosInput.value, 10) || defaultConfig.cantidadPartidos,
+          tipoApuesta: tipoApuestaSelect.value
+        };
+        
+        // Validar valores
+        if (config.repeticiones < 1) config.repeticiones = 1;
+        if (config.montoApuesta < 10) config.montoApuesta = 10;
+        if (config.cantidadPartidos < 1) config.cantidadPartidos = 1;
+        
+        // Guardar configuración
+        const result = await ipcRenderer.invoke('guardar-configuracion', config);
+        
+        if (result.success) {
+          mostrarMensaje('Configuración guardada');
+        } else {
+          mostrarMensaje('Error al guardar');
+          console.error('Error al guardar:', result.error);
+        }
+      } catch (error) {
+        console.error('Error al guardar la configuración:', error);
+        mostrarMensaje('Error al guardar');
+      }
+    };
+    
+    // Cargar valores por defecto
+    const cargarValoresPorDefecto = () => {
+      repeticionesInput.value = defaultConfig.repeticiones;
+      montoApuestaInput.value = defaultConfig.montoApuesta;
+      cantidadPartidosInput.value = defaultConfig.cantidadPartidos;
+      tipoApuestaSelect.value = defaultConfig.tipoApuesta;
+    };
+    
+    // Configurar eventos para guardar automáticamente
+    repeticionesInput.addEventListener('change', guardarConfiguracion);
+    montoApuestaInput.addEventListener('change', guardarConfiguracion);
+    cantidadPartidosInput.addEventListener('change', guardarConfiguracion);
+    tipoApuestaSelect.addEventListener('change', guardarConfiguracion);
+    
+    // También guardar al terminar de escribir en los campos numéricos
+    repeticionesInput.addEventListener('blur', guardarConfiguracion);
+    montoApuestaInput.addEventListener('blur', guardarConfiguracion);
+    cantidadPartidosInput.addEventListener('blur', guardarConfiguracion);
+    
+    // Volver a la página principal
+    btnVolver.addEventListener('click', () => {
+      // Guardar antes de volver
+      guardarConfiguracion().then(() => {
+        ipcRenderer.send('configuracion-cerrada');
+      });
+    });
+    
+    // Notificar al proceso principal cuando se cierra la ventana
+    window.addEventListener('beforeunload', () => {
+      ipcRenderer.send('configuracion-cerrada');
+    });
+    
+    // Inicializar
+    document.addEventListener('DOMContentLoaded', cargarConfiguracion);
+  </script>
+</body>
+</html> 

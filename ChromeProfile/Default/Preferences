@@ -1,0 +1,11 @@
+{
+  "profile": {
+    "exit_type": "Normal",
+    "exited_cleanly": true
+  },
+  "browser": {
+    "enabled_labs_experiments": ["disable-automation"]
+  },
+  "credentials_enable_service": false,
+  "credentials_enable_autosignin": false
+}
