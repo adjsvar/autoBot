@@ -503,6 +503,10 @@ app.on('ready', () => {
   createWindow();
   createTray();
   
+  // Reiniciar estado de sesión al inicio de la aplicación
+  sesionIniciada = false;
+  sesionVerificadaFlag = false;
+  
   // Verificar estado del navegador cuando la app está lista
   setTimeout(async () => {
     const status = browserContext !== null;
@@ -912,22 +916,13 @@ ipcMain.handle('buscar-partidos', async () => {
 ipcMain.handle('iniciar-sesion', async (event, data = {}) => {
   let page = null;
   const loginUrl = 'https://1xbet.mobi/es/user/login?platform_type=mobile';
+  let intervaloVerificacion = null;
 
   try {
-    // Notificar que estamos verificando la sesión
-    notifyBrowserStatusChanged(true, "Verificando estado de sesión...");
-    
-    // Primero verificar si ya hay una sesión iniciada
-    const sesionActiva = await verificarSesion();
-    if (sesionActiva) {
-      console.log('La sesión ya está iniciada, no es necesario iniciar sesión');
-      notifyBrowserStatusChanged(true, "✅ Sesión ya iniciada");
-      return { success: true, alreadyLoggedIn: true };
-    }
-    
-    // Si no hay sesión, continuamos con el proceso de inicio de sesión
+    // Notificar que estamos iniciando sesión
     notifyBrowserStatusChanged(true, "Iniciando sesión...");
     
+    // Verificar si el navegador está iniciado
     if (!browserContext) {
       const success = await initBrowser();
       if (!success) {
@@ -938,9 +933,8 @@ ipcMain.handle('iniciar-sesion', async (event, data = {}) => {
       // Verificar si el browserContext sigue siendo válido
       try {
         await browserContext.pages().catch(() => {
-          // Si el navegador se cerró manualmente, simplemente actualizamos el estado
+          // Si el navegador se cerró manualmente, actualizar estado
           browserContext = null;
-          // Terminamos silenciosamente
           return { success: false, silent: true };
         });
       } catch (error) {
@@ -953,7 +947,7 @@ ipcMain.handle('iniciar-sesion', async (event, data = {}) => {
       }
     }
 
-    // Si el navegador ya no existe después de la verificación, terminamos silenciosamente
+    // Si el navegador ya no existe después de la verificación, terminamos
     if (!browserContext) {
       return { success: false, silent: true };
     }
@@ -971,21 +965,6 @@ ipcMain.handle('iniciar-sesion', async (event, data = {}) => {
       } catch (error) {
         console.log('Error al obtener páginas, creando una nueva');
         page = await browserContext.newPage();
-      }
-      
-      // Verificar nuevamente si hay sesión iniciada en la página actual
-      try {
-        // Si la página ya está abierta, verificar la sesión en esa página
-        if (page.url() && page.url() !== 'about:blank') {
-          const sesionIniciadaEnPagina = await verificarSesionEnPagina(page);
-          if (sesionIniciadaEnPagina) {
-            console.log('Sesión detectada en la página actual');
-            notifyBrowserStatusChanged(true, "✅ Sesión iniciada");
-            return { success: true, alreadyLoggedIn: true };
-          }
-        }
-      } catch (e) {
-        console.log('Error al verificar sesión en página actual:', e.message);
       }
       
       // Navegar directamente a la página de login
@@ -1015,39 +994,50 @@ ipcMain.handle('iniciar-sesion', async (event, data = {}) => {
         console.log('Error al cerrar diálogos:', e.message);
       }
       
-      // Verificar inmediatamente si ya hay sesión iniciada en la página de login
-      const sesionIniciadaTrasNavegar = await verificarSesionEnPagina(page);
-      if (sesionIniciadaTrasNavegar) {
-        console.log('Sesión detectada después de navegar');
-        notifyBrowserStatusChanged(true, "✅ Sesión iniciada");
-        return { success: true, alreadyLoggedIn: true };
+      // Configurar un intervalo para verificar si aparece el ícono de usuario (sesión iniciada)
+      notifyBrowserStatusChanged(true, "Esperando inicio de sesión manual...");
+      
+      // Limpiar cualquier intervalo previo
+      if (intervaloVerificacion) {
+        clearInterval(intervaloVerificacion);
       }
       
-      // Configurar un intervalo para verificar el estado de la sesión
-      const checkInterval = setInterval(async () => {
+      // Crear un nuevo intervalo de verificación
+      intervaloVerificacion = setInterval(async () => {
         try {
           if (!page || page.isClosed()) {
-            clearInterval(checkInterval);
+            clearInterval(intervaloVerificacion);
             return;
           }
           
-          const sesionIniciadaEnIntervalo = await verificarSesionEnPagina(page);
-          if (sesionIniciadaEnIntervalo) {
-            console.log('Sesión iniciada detectada en intervalo');
-            clearInterval(checkInterval);
+          // Verificar si existe el ícono de usuario que indica sesión iniciada
+          const iconoUsuarioCount = await page.locator('.ico--user, .ico.user-control-panel-button__ico').count();
+          
+          if (iconoUsuarioCount > 0) {
+            console.log('¡Sesión iniciada detectada! Se encontró el ícono de usuario.');
+            
+            // Marcar la sesión como iniciada
+            sesionIniciada = true;
+            sesionVerificadaFlag = true;
+            
+            // Notificar al renderer sobre el cambio de estado
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              notifyBrowserStatusChanged(true, "✅ Sesión iniciada");
+              mainWindow.webContents.send('sesion-status', true);
+            }
+            
+            // Detener el intervalo de verificación
+            clearInterval(intervaloVerificacion);
           }
         } catch (error) {
-          console.log('Error al verificar estado de sesión en intervalo:', error.message);
+          console.log('Error al verificar ícono de usuario:', error.message);
           if (error.message.includes('closed') || error.message.includes('detached')) {
-            clearInterval(checkInterval);
+            clearInterval(intervaloVerificacion);
           }
         }
-      }, 3000); // Verificar cada 3 segundos
+      }, 2000); // Verificar cada 2 segundos
       
-      // Solo mostrar "Esperando inicio de sesión manual" si realmente no hay sesión iniciada
-      notifyBrowserStatusChanged(true, "Esperando inicio de sesión manual");
-      
-      // Mantenemos la página abierta y no la cerramos para que el usuario pueda iniciar sesión manualmente
+      // Mantenemos la página abierta para que el usuario pueda iniciar sesión manualmente
       return { success: true };
     } catch (error) {
       // Detectar si el error es por cierre manual del navegador
@@ -1090,6 +1080,7 @@ async function verificarSesionEnPagina(page) {
       '.ui-caption--size-xs.ui-caption:has-text("Iniciar sesión")'
     ];
     
+    // Verificar si hay elementos de inicio de sesión (PRESENTES = NO HAY SESIÓN)
     let loginElementFound = false;
     
     for (const selector of loginSelectors) {
@@ -1101,48 +1092,29 @@ async function verificarSesionEnPagina(page) {
       }
     }
     
-    // Verificar si hay elementos que indican sesión iniciada
-    const loggedInSelectors = [
-      '.deposit-button',
-      '.account-button',
-      '.balance-button',
-      '.profile-button',
-      '.username-container',
-      '.user-info',
-      '.balance'
+    // Verificar si existe el ícono de usuario (icono de usuario PRESENTE = SESIÓN INICIADA)
+    const userIconSelectors = [
+      '.ico--user', 
+      '.ico.user-control-panel-button__ico',
+      '.user-control-panel-button'
     ];
     
-    let loggedInElementFound = false;
-    
-    for (const selector of loggedInSelectors) {
+    let userIconFound = false;
+    for (const selector of userIconSelectors) {
       const count = await page.locator(selector).count();
       if (count > 0) {
-        console.log(`Elemento de sesión iniciada encontrado: "${selector}"`);
-        loggedInElementFound = true;
+        console.log(`Ícono de usuario encontrado: "${selector}"`);
+        userIconFound = true;
         break;
       }
     }
     
-    // Verificar cookies de sesión
-    const cookies = await page.context().cookies();
-    const sessionCookies = cookies.filter(cookie => 
-      cookie.name.toLowerCase().includes('session') || 
-      cookie.name.toLowerCase().includes('auth') ||
-      cookie.name.toLowerCase().includes('login') ||
-      cookie.name.toLowerCase().includes('user') ||
-      cookie.name.toLowerCase().includes('token')
-    );
+    // La sesión está iniciada si:
+    // 1. NO se encuentra el botón de inicio de sesión, O
+    // 2. SÍ se encuentra el ícono de usuario
+    const estaIniciada = !loginElementFound || userIconFound;
     
-    console.log(`Cookies de sesión encontradas: ${sessionCookies.length}`);
-    
-    // Determinar si la sesión está iniciada basado en múltiples factores
-    // 1. No hay elementos de login Y/O
-    // 2. Hay elementos que indican sesión iniciada Y/O
-    // 3. Hay cookies de sesión
-    const estaIniciada = 
-      (!loginElementFound || loggedInElementFound || sessionCookies.length > 0);
-    
-    console.log(`Verificación en página: Sesión ${estaIniciada ? 'iniciada' : 'no iniciada'} (loginElement: ${loginElementFound}, loggedInElement: ${loggedInElementFound}, sessionCookies: ${sessionCookies.length})`);
+    console.log(`Verificación en página: Sesión ${estaIniciada ? 'iniciada' : 'no iniciada'} (loginElement: ${loginElementFound}, userIcon: ${userIconFound})`);
     
     // Actualizar estado global de sesión
     if (estaIniciada !== sesionIniciada) {
@@ -1189,6 +1161,10 @@ ipcMain.handle('modo-auto', async () => {
         notifyBrowserStatusChanged(false, "Error al iniciar navegador");
         return { success: false, error: "No se pudo iniciar el navegador" };
       }
+      
+      // Esperar un tiempo adicional para asegurar que las cookies se carguen correctamente
+      console.log("Esperando que se inicialice completamente el navegador y se carguen las cookies...");
+      await new Promise(resolve => setTimeout(resolve, 5000));
     }
     
     // Cargar configuración
@@ -1230,7 +1206,6 @@ ipcMain.handle('modo-auto', async () => {
     const partidosAProcesar = partidosMezclados.slice(0, cantidadProcesar);
     
     console.log(`Se procesarán ${cantidadProcesar} partidos de ${partidos.length} seleccionados`);
-    notifyBrowserStatusChanged(true, `Procesando ${cantidadProcesar} partidos...`);
     
     // Crear una nueva página si no existe
     let page;
@@ -1251,28 +1226,186 @@ ipcMain.handle('modo-auto', async () => {
     }
     
     // Configurar timeout más largo para operaciones de navegación
-    page.setDefaultNavigationTimeout(60000);
+    page.setDefaultNavigationTimeout(90000);
     
-    // Primero, navegar a la página principal de fútbol como solicitó el usuario
-    notifyBrowserStatusChanged(true, "Abriendo página principal de fútbol...");
-    console.log("Navegando a la página principal de fútbol...");
+    // Verificar y guardar el estado actual de las cookies
+    try {
+      const cookies = await browserContext.cookies();
+      console.log(`Estado actual de cookies: ${cookies.length} cookies cargadas`);
+      
+      if (cookies.length === 0) {
+        console.log("⚠️ ADVERTENCIA: No se han cargado cookies. La sesión puede no estar activa.");
+        
+        // Navegar a la página principal primero para inicializar la sesión
+        notifyBrowserStatusChanged(true, "Inicializando sesión...");
+        console.log("Navegando a la página principal para inicializar cookies...");
+        
+        await page.goto("https://1xbet.mobi/es", { 
+          waitUntil: 'networkidle' 
+        });
+        
+        console.log("Esperando inicialización de cookies...");
+        await page.waitForTimeout(5000);
+        
+        // Verificar nuevamente las cookies
+        const cookiesActualizadas = await browserContext.cookies();
+        console.log(`Cookies después de inicialización: ${cookiesActualizadas.length} cookies cargadas`);
+      }
+    } catch (error) {
+      console.error("Error al verificar cookies:", error.message);
+    }
     
-    // Navegar a la URL de fútbol
-    await page.goto("https://1xbet.mobi/es/line/football?platform_type=mobile", { 
-      waitUntil: 'domcontentloaded' 
-    });
+    // NAVEGAR AL CUPÓN: asegurarse de que la página se cargue completamente
+    notifyBrowserStatusChanged(true, "Abriendo cupón de apuestas...");
+    console.log("Navegando al cupón de apuestas...");
     
-    // Esperar a que la página cargue completamente
+    // Usar espera de tipo 'networkidle' para asegurar carga completa
+    try {
+      // Primer intento con networkidle (espera a que la red esté inactiva)
+      await page.goto("https://1xbet.mobi/es/user/coupon?platform_type=mobile", { 
+        waitUntil: 'networkidle',
+        timeout: 30000
+      });
+    } catch (error) {
+      console.log("Error en primera carga del cupón, reintentando:", error.message);
+      
+      // Segundo intento con domcontentloaded (más rápido)
+      await page.goto("https://1xbet.mobi/es/user/coupon?platform_type=mobile", { 
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+    }
+    
+    // Esperar tiempo adicional para asegurar que la página se cargue completamente
+    console.log("Esperando que se cargue completamente la página del cupón...");
     await page.waitForTimeout(5000);
+    
+    // Verificar que estamos en la página correcta
+    const urlActual = page.url();
+    console.log(`URL actual después de navegación: ${urlActual}`);
+    
+    if (!urlActual.includes('/user/coupon')) {
+      console.log("⚠️ No se pudo cargar la página del cupón correctamente. URL actual:", urlActual);
+      notifyBrowserStatusChanged(false, "Error al cargar cupón");
+      
+      // Intentar nuevamente con una URL diferente
+      console.log("Reintentando con URL alternativa...");
+      await page.goto("https://1xbet.mobi/es/user/coupon", { 
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
+      
+      await page.waitForTimeout(3000);
+    }
+    
+    // Capturar una screenshot para debugging
+    try {
+      await page.screenshot({ path: path.join(__dirname, 'coupon-page.png') });
+      console.log("Screenshot guardado para verificación");
+    } catch (error) {
+      console.log("Error al guardar screenshot:", error.message);
+    }
+    
+    // Intentar eliminar todas las apuestas existentes
+    notifyBrowserStatusChanged(true, "Limpiando cupón de apuestas existentes...");
+    try {
+      // Buscar el botón de eliminar todo
+      console.log("Buscando botón para eliminar todas las apuestas...");
+      const eliminarTodoCount = await page.locator('button[aria-label="Eliminar"][title="Eliminar"] .ico--trash-alt').count();
+      if (eliminarTodoCount > 0) {
+        console.log("Encontrado botón para eliminar todas las apuestas, haciendo clic...");
+        await page.locator('button[aria-label="Eliminar"][title="Eliminar"] .ico--trash-alt').first().click();
+        await page.waitForTimeout(3000);
+      } else {
+        console.log("No se encontró el botón para eliminar todas las apuestas");
+      }
+      
+      // Eliminar apuestas bloqueadas (coupon-bet-lock) si existen
+      let intentos = 0;
+      const maxIntentos = 10;
+      
+      // Loop para intentar eliminar todos los coupon-bet-lock
+      while (intentos < maxIntentos) {
+        const locksCount = await page.locator('.coupon-bet__lock.coupon-bet-lock').count();
+        if (locksCount === 0) {
+          console.log("No hay más apuestas bloqueadas");
+          break;
+        }
+        
+        console.log(`Encontradas ${locksCount} apuestas bloqueadas, eliminando...`);
+        
+        // Intentar hacer clic en todos los botones de eliminar
+        for (let i = 0; i < locksCount; i++) {
+          try {
+            // Buscar el botón de eliminar dentro del elemento bloqueado
+            const removeButton = page.locator('.coupon-bet__lock.coupon-bet-lock').nth(i).locator('.coupon-bet-lock__remove');
+            await removeButton.click();
+            await page.waitForTimeout(1000);
+          } catch (e) {
+            console.log(`Error al eliminar apuesta bloqueada ${i}:`, e.message);
+          }
+        }
+        
+        // Esperar un momento antes de verificar de nuevo
+        await page.waitForTimeout(1500);
+        intentos++;
+      }
+    } catch (error) {
+      console.log("Error al limpiar el cupón:", error.message);
+    }
+    
+    // Proceder directamente a procesar los partidos sin ir a la página de fútbol
+    notifyBrowserStatusChanged(true, `Procesando ${cantidadProcesar} partidos...`);
+    console.log(`Comenzando procesamiento directo de ${cantidadProcesar} partidos...`);
     
     // Contador de partidos procesados con éxito
     let procesadosExito = 0;
     let procesadosTotal = 0;
     
-    // Procesar cada partido
-    for (const partido of partidosAProcesar) {
+    // Función auxiliar para verificar el número actual de apuestas en el cupón
+    const verificarContadorApuestas = async () => {
+      try {
+        // Verificar el contador de apuestas en el cupón
+        const contadorCount = await page.locator('.ui-badge.ui-badge--theme-accent.bottom-navigation-link-coupon-content__count').count();
+        
+        if (contadorCount > 0) {
+          // Obtener el texto del contador
+          const texto = await page.locator('.ui-badge.ui-badge--theme-accent.bottom-navigation-link-coupon-content__count').first().innerText();
+          
+          // Convertir el texto a número
+          const numeroApuestas = parseInt(texto.trim(), 10) || 0;
+          console.log(`Contador de apuestas actual: ${numeroApuestas}`);
+          return numeroApuestas;
+        } else {
+          // Intentar un selector alternativo
+          const contadorAltCount = await page.locator('.bottom-navigation-link-coupon-content__count').count();
+          if (contadorAltCount > 0) {
+            const textoAlt = await page.locator('.bottom-navigation-link-coupon-content__count').first().innerText();
+            const numeroApuestasAlt = parseInt(textoAlt.trim(), 10) || 0;
+            console.log(`Contador alternativo de apuestas: ${numeroApuestasAlt}`);
+            return numeroApuestasAlt;
+          }
+        }
+        console.log("No se encontró el contador de apuestas en la página");
+        return 0;
+      } catch (error) {
+        console.log("Error al verificar contador de apuestas:", error.message);
+        return 0;
+      }
+    };
+    
+    // Verificar contador inicial
+    let contadorApuestas = await verificarContadorApuestas();
+    console.log(`Contador inicial de apuestas: ${contadorApuestas}`);
+    
+    // Procesar cada partido hasta alcanzar la cantidad deseada
+    let partidoIndex = 0;
+    while (procesadosExito < cantidadProcesar && partidoIndex < partidosAProcesar.length) {
       try {
         procesadosTotal++;
+        const partido = partidosAProcesar[partidoIndex];
+        partidoIndex++;
+        
         notifyBrowserStatusChanged(true, `Procesando partido ${procesadosTotal}/${cantidadProcesar}...`);
         
         // Si no tiene link, continuar con el siguiente
@@ -1294,8 +1427,16 @@ ipcMain.handle('modo-auto', async () => {
         const resultado = await realizarApuesta(page, config);
         
         if (resultado.success) {
-          procesadosExito++;
-          console.log(`✅ Apuesta realizada con éxito en: ${partido.nombre}`);
+          // Verificar si la apuesta realmente se agregó al cupón
+          const contadorNuevo = await verificarContadorApuestas();
+          if (contadorNuevo > contadorApuestas) {
+            procesadosExito++;
+            contadorApuestas = contadorNuevo;
+            console.log(`✅ Apuesta realizada con éxito en: ${partido.nombre}`);
+            console.log(`Contador de apuestas actualizado: ${contadorApuestas}/${cantidadProcesar}`);
+          } else {
+            console.log(`⚠️ La apuesta aparentemente no se agregó al cupón: ${partido.nombre}`);
+          }
         } else {
           console.log(`❌ Error al realizar apuesta en: ${partido.nombre}`);
           console.log(`Error: ${resultado.error}`);
@@ -1303,17 +1444,23 @@ ipcMain.handle('modo-auto', async () => {
         
         // Esperar entre partidos
         await page.waitForTimeout(2000);
+        
+        // Si ya hemos alcanzado el número deseado de apuestas, terminar
+        if (contadorApuestas >= cantidadProcesar) {
+          console.log(`Se ha alcanzado el número deseado de apuestas (${contadorApuestas}/${cantidadProcesar}), finalizando...`);
+          break;
+        }
       } catch (error) {
         console.error(`Error procesando partido: ${error.message}`);
       }
     }
     
-    // Al finalizar, navegar a la página del cupón de apuestas en lugar de volver a la página principal
+    // Al finalizar, navegar a la página del cupón de apuestas para colocar el monto
     try {
       notifyBrowserStatusChanged(true, "Navegando a la página del cupón de apuestas...");
       console.log("Navegando a la página del cupón de apuestas...");
       
-      await page.goto("https://1xbet.mobi/en/user/coupon", { 
+      await page.goto("https://1xbet.mobi/es/user/coupon?platform_type=mobile", { 
         waitUntil: 'domcontentloaded' 
       });
       
@@ -1321,11 +1468,61 @@ ipcMain.handle('modo-auto', async () => {
       await page.waitForTimeout(3000);
       
       console.log("Página del cupón de apuestas cargada correctamente");
+      
+      // Verificar número final de apuestas
+      const contadorFinal = await verificarContadorApuestas();
+      console.log(`Contador final de apuestas: ${contadorFinal}/${cantidadProcesar}`);
+      
+      // Intentar establecer el monto de apuesta
+      try {
+        // Buscar el input de monto y escribir el valor
+        const inputMontoCount = await page.locator('input.coupon-action-form__sum').count();
+        if (inputMontoCount > 0) {
+          console.log(`Estableciendo monto de apuesta: ${config.montoApuesta}`);
+          
+          // Limpiar el campo primero
+          await page.locator('input.coupon-action-form__sum').first().click({ clickCount: 3 });
+          await page.locator('input.coupon-action-form__sum').first().fill('');
+          await page.waitForTimeout(500);
+          
+          // Escribir el nuevo valor
+          await page.locator('input.coupon-action-form__sum').first().fill(config.montoApuesta.toString());
+          await page.waitForTimeout(1000);
+          
+          console.log(`Monto de apuesta establecido: ${config.montoApuesta}`);
+        } else {
+          console.log("No se encontró el campo para el monto de apuesta");
+        }
+      } catch (error) {
+        console.error("Error al establecer monto de apuesta:", error.message);
+      }
+      
+      // Finalizar el proceso de la repetición actual
+      notifyBrowserStatusChanged(true, `✅ Completado: ${procesadosExito}/${cantidadProcesar} partidos`);
+      console.log(`Proceso de repetición completado. Procesados ${procesadosExito} de ${cantidadProcesar} partidos con éxito.`);
+      
+      // Ejecutar la siguiente repetición (si es necesario)
+      // Esto se manejaría en el front-end o con un contador de repeticiones
+      
+      // Cerrar el navegador para iniciar la siguiente repetición con un navegador fresco
+      if (config.repeticiones > 1) {
+        console.log("Cerrando navegador para iniciar nueva repetición...");
+        
+        // Esperar un tiempo para que el usuario pueda ver el resultado
+        await page.waitForTimeout(5000);
+        
+        // Cerrar el navegador
+        if (browserContext) {
+          await browserContext.close().catch(error => {
+            console.error("Error al cerrar el navegador:", error.message);
+          });
+          browserContext = null;
+        }
+      }
     } catch (error) {
       console.error("Error al navegar a la página del cupón:", error);
     }
     
-    notifyBrowserStatusChanged(true, `✅ Completado: ${procesadosExito}/${cantidadProcesar} partidos`);
     return { 
       success: true, 
       message: `Proceso completado. ${procesadosExito} de ${cantidadProcesar} partidos procesados con éxito.` 
@@ -1377,49 +1574,11 @@ async function realizarApuesta(page, config) {
     console.log("Clic en '1.ª mitad' realizado");
     await sleep(800); // Mismo delay que en el código original
     
-    // 2. Esperar encabezado "Total. 1.ª mitad" exactamente como en el código original
-    console.log("Esperando encabezado 'Total. 1.ª mitad'...");
+    // 2. Esperar encabezado "Total. 1.ª mitad" u otros según el tipo de apuesta
+    console.log(`Esperando encabezado correspondiente a ${config.tipoApuesta}...`);
     
-    const headerTotalPrimeraFound = await page.evaluate((tipoApuesta) => {
-      // Implementación de la función waitFor del código original
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
-      
-      const waitFor = async (fn, timeout = 5000, step = 100) => {
-        const t0 = performance.now();
-        while (performance.now() - t0 < timeout) {
-          const val = fn();
-          if (val) return val;
-          await sleep(step);
-        }
-        return null;
-      };
-      
-      // Buscar el encabezado según el tipo de apuesta configurado
-      let patronBusqueda;
-      if (tipoApuesta.includes("Más de") || tipoApuesta.includes("Menos de")) {
-        patronBusqueda = /total\.?\s*1\.?ª?\s*mitad/i;
-      } else if (tipoApuesta === "Ambos equipos marcarán") {
-        patronBusqueda = /ambos\s+equipos\s+marcarán/i;
-      } else if (tipoApuesta === "Victoria Local" || tipoApuesta === "Victoria Visitante" || tipoApuesta === "Empate") {
-        patronBusqueda = /resultado\s+del\s+partido/i;
-      } else {
-        patronBusqueda = /total\.?\s*1\.?ª?\s*mitad/i; // Predeterminado
-      }
-      
-      // Usar la función waitFor para esperar el encabezado
-      return waitFor(() => {
-        return Array.from(
-          document.querySelectorAll('.game-markets-group-header__name')
-        ).find(h => patronBusqueda.test(h.textContent));
-      }, 7000);
-      
-    }, config.tipoApuesta);
-    
-    // Esperar a que la promesa se resuelva
-    await sleep(7000);
-    
-    // Verificar si se encontró el encabezado
-    const headerFound = await page.evaluate((tipoApuesta) => {
+    // Primero verificamos inmediatamente si el encabezado ya está visible
+    const headerVisible = await page.evaluate((tipoApuesta) => {
       let patronBusqueda;
       if (tipoApuesta.includes("Más de") || tipoApuesta.includes("Menos de")) {
         patronBusqueda = /total\.?\s*1\.?ª?\s*mitad/i;
@@ -1438,12 +1597,41 @@ async function realizarApuesta(page, config) {
       return !!header;
     }, config.tipoApuesta);
     
-    if (!headerFound) {
-      console.log("No se encontró el encabezado correspondiente al tipo de apuesta");
-      return { success: false, error: "No se encontró el encabezado correspondiente" };
+    // Si el encabezado ya está visible, no esperamos más
+    if (headerVisible) {
+      console.log("Encabezado correspondiente encontrado inmediatamente");
+    } else {
+      // Si no está visible, esperamos un máximo de 2 segundos
+      console.log("Encabezado no encontrado inmediatamente, esperando...");
+      await page.waitForTimeout(2000);
+      
+      // Verificar si el encabezado apareció después de la espera
+      const headerFoundAfterWait = await page.evaluate((tipoApuesta) => {
+        let patronBusqueda;
+        if (tipoApuesta.includes("Más de") || tipoApuesta.includes("Menos de")) {
+          patronBusqueda = /total\.?\s*1\.?ª?\s*mitad/i;
+        } else if (tipoApuesta === "Ambos equipos marcarán") {
+          patronBusqueda = /ambos\s+equipos\s+marcarán/i;
+        } else if (tipoApuesta === "Victoria Local" || tipoApuesta === "Victoria Visitante" || tipoApuesta === "Empate") {
+          patronBusqueda = /resultado\s+del\s+partido/i;
+        } else {
+          patronBusqueda = /total\.?\s*1\.?ª?\s*mitad/i; // Predeterminado
+        }
+        
+        const header = Array.from(
+          document.querySelectorAll('.game-markets-group-header__name')
+        ).find(h => patronBusqueda.test(h.textContent));
+        
+        return !!header;
+      }, config.tipoApuesta);
+      
+      if (headerFoundAfterWait) {
+        console.log("Encabezado correspondiente encontrado después de esperar");
+      } else {
+        console.log("No se encontró el encabezado correspondiente al tipo de apuesta");
+        return { success: false, error: "No se encontró el encabezado correspondiente" };
+      }
     }
-    
-    console.log("Encabezado correspondiente encontrado");
     
     // 3. Buscar la opción específica dentro del grupo según el tipo de apuesta configurado
     console.log(`Buscando opción '${config.tipoApuesta}'...`);
@@ -1483,7 +1671,7 @@ async function realizarApuesta(page, config) {
       // Implementación de la función waitFor del código original
       const sleep = ms => new Promise(r => setTimeout(r, ms));
       
-      const waitFor = async (fn, timeout = 5000, step = 100) => {
+      const waitFor = async (fn, timeout = 500, step = 50) => {
         const t0 = performance.now();
         while (performance.now() - t0 < timeout) {
           const val = fn();
@@ -1525,20 +1713,29 @@ async function realizarApuesta(page, config) {
         return false;
       }
       
-      // Buscar la opción dentro del grupo
+      // Primero verificar si ya existe el botón sin esperar
       const regexp = new RegExp(patronApuesta, 'i');
-      const marketOption = await waitFor(() =>
+      let marketOption = Array.from(grupo.querySelectorAll('.ui-market__name'))
+        .find(el => regexp.test(el.textContent));
+        
+      // Si se encontró inmediatamente, hacer clic
+      if (marketOption) {
+        console.log(`✔ Encontrado inmediatamente "${marketOption.textContent.trim()}"`);
+        marketOption.click();
+        console.log(`✔ Seleccionado "${marketOption.textContent.trim()}"`);
+        return true;
+      }
+      
+      // Si no se encontró inmediatamente, esperar un tiempo corto
+      marketOption = await waitFor(() =>
         Array.from(grupo.querySelectorAll('.ui-market__name'))
           .find(el => regexp.test(el.textContent))
-      , 5000);
+      , 500);
       
       if (!marketOption) {
         console.warn(`No se encontró la opción que coincida con el patrón: ${patronApuesta}`);
         return false;
       }
-      
-      // Esperar 1 segundo antes de hacer clic (exactamente como en el código original)
-      await sleep(1000);
       
       // Hacer clic en la opción
       marketOption.click();
@@ -1606,7 +1803,13 @@ async function cargarPartidosSeleccionados() {
 
 // Verificar sesión
 async function verificarSesion() {
-  // Si ya se verificó la sesión, no volver a verificar innecesariamente
+  // Reiniciar el estado de sesión cada vez que se inicia la aplicación
+  // Esto soluciona el problema de que la sesión se marque como iniciada cuando no lo está
+  if (!sesionIniciada) {
+    sesionVerificadaFlag = false;
+  }
+  
+  // Si ya se verificó la sesión en esta ejecución, no volver a verificar innecesariamente
   if (sesionVerificadaFlag && sesionIniciada) {
     console.log('Sesión ya verificada previamente, omitiendo verificación');
     
@@ -1676,10 +1879,10 @@ async function verificarSesion() {
     const page = await headlessContext.newPage();
     console.log('Navegador headless iniciado para verificar sesión');
     
-    // Usar la misma URL que en la función iniciar-sesion
-    const loginUrl = 'https://1xbet.mobi/es/user/login?platform_type=mobile';
-    console.log('Navegando a página de login para verificar sesión...');
-    await page.goto(loginUrl, {
+    // Usar la URL de partidos en lugar de la página de login
+    const url = 'https://1xbet.mobi/es/line/football?platform_type=mobile';
+    console.log('Navegando a página de partidos para verificar sesión...');
+    await page.goto(url, {
       timeout: 90000
     });
       
@@ -1708,8 +1911,7 @@ async function verificarSesion() {
       console.log('Error al cerrar diálogos:', e.message);
     }
     
-    // Usar la misma lógica que verificarSesionEnPagina
-    // Verificar si existe algún botón o elemento de login
+    // Verificar si existe el botón de inicio de sesión
     const loginSelectors = [
       '.login-btn', 
       '.authorization-btn', 
@@ -1718,8 +1920,8 @@ async function verificarSesion() {
       '.ui-caption--size-xs.ui-caption:has-text("Iniciar sesión")'
     ];
     
+    // Verificar si hay elementos de inicio de sesión (PRESENTES = NO HAY SESIÓN)
     let loginElementFound = false;
-    
     for (const selector of loginSelectors) {
       const count = await page.locator(selector).count();
       if (count > 0) {
@@ -1729,47 +1931,29 @@ async function verificarSesion() {
       }
     }
     
-    // Verificar si hay elementos que indican sesión iniciada
-    const loggedInSelectors = [
-      '.deposit-button',
-      '.account-button',
-      '.balance-button',
-      '.profile-button',
-      '.username-container',
-      '.user-info',
-      '.balance'
+    // Verificar si existe el ícono de usuario (icono de usuario PRESENTE = SESIÓN INICIADA)
+    const userIconSelectors = [
+      '.ico--user', 
+      '.ico.user-control-panel-button__ico',
+      '.user-control-panel-button'
     ];
     
-    let loggedInElementFound = false;
-    
-    for (const selector of loggedInSelectors) {
+    let userIconFound = false;
+    for (const selector of userIconSelectors) {
       const count = await page.locator(selector).count();
       if (count > 0) {
-        console.log(`Elemento de sesión iniciada encontrado: "${selector}"`);
-        loggedInElementFound = true;
+        console.log(`Ícono de usuario encontrado: "${selector}"`);
+        userIconFound = true;
         break;
       }
     }
     
-    // Verificar cookies de sesión
-    const cookies = await page.context().cookies();
-    const sessionCookies = cookies.filter(cookie => 
-      cookie.name.toLowerCase().includes('session') || 
-      cookie.name.toLowerCase().includes('auth') ||
-      cookie.name.toLowerCase().includes('login') ||
-      cookie.name.toLowerCase().includes('user') ||
-      cookie.name.toLowerCase().includes('token')
-    );
+    // La sesión está iniciada si:
+    // 1. NO se encuentra el botón de inicio de sesión, O
+    // 2. SÍ se encuentra el ícono de usuario
+    sesionIniciada = !loginElementFound || userIconFound;
     
-    console.log(`Cookies de sesión encontradas: ${sessionCookies.length}`);
-    
-    // Determinar si la sesión está iniciada basado en múltiples factores
-    // 1. No hay elementos de login Y/O
-    // 2. Hay elementos que indican sesión iniciada Y/O
-    // 3. Hay cookies de sesión
-    sesionIniciada = (!loginElementFound || loggedInElementFound || sessionCookies.length > 0);
-    
-    console.log(`Estado de sesión: ${sesionIniciada ? 'Iniciada' : 'No iniciada'} (loginElement: ${loginElementFound}, loggedInElement: ${loggedInElementFound}, sessionCookies: ${sessionCookies.length})`);
+    console.log(`Estado de sesión: ${sesionIniciada ? 'Iniciada' : 'No iniciada'} (loginElement: ${loginElementFound}, userIcon: ${userIconFound})`);
     
     // Notificar el estado de la sesión
     if (sesionIniciada) {
